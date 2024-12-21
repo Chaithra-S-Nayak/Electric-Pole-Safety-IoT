@@ -1,0 +1,99 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// Define pins for voltage sensor
+const int sensorPin = A0;  // Analog pin connected to the voltage sensor
+
+// Define scaling factor and reference voltage
+const float scalingFactor = 5.0;	// Scaling factor for 0-25V sensor
+const float referenceVoltage = 5.0; // Arduino reference voltage (e.g., 5V for Uno)
+const float voltageThreshold = 3.0; // Threshold voltage to trigger distance check
+
+// Define pins for ultrasonic sensor
+const int trigPin = 2;
+const int echoPin = 3;
+const float distanceThreshold = 200.0; // Threshold distance in cm to trigger alert
+
+// Define pin for buzzer
+const int buzzerPin = 4;  // Pin connected to buzzer
+
+// Initialize LCD (change address if necessary)
+LiquidCrystal_I2C lcd(0x27, 16, 2);  // 16 columns and 2 rows
+
+void setup() {
+  // Initialize serial communication for debugging
+  Serial.begin(9600);
+
+  // Initialize the LCD
+  lcd.begin(16, 2);
+  lcd.backlight();
+ 
+  // Set up the ultrasonic sensor pins
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+ 
+  // Set up the buzzer pin
+  pinMode(buzzerPin, OUTPUT);
+ 
+  // Initial message on LCD
+  lcd.setCursor(0, 0);
+  lcd.print("Voltage & Dist.");
+}
+
+void loop() {
+  // Read voltage from the sensor
+  int sensorValue = analogRead(sensorPin);
+  float voltage = (sensorValue * referenceVoltage) / 1023.0;
+  float actualVoltage = voltage * scalingFactor;
+ 
+  // Display voltage on the serial monitor
+  Serial.print("Voltage: ");
+  Serial.print(actualVoltage);
+  Serial.println(" V");
+
+  // Check if voltage is above the threshold
+  if (actualVoltage > voltageThreshold) {
+	// Voltage is high, proceed to check distance
+	lcd.clear();
+	lcd.setCursor(0, 0);
+	lcd.print("Alert: Obj. Near!");
+
+	float distance = getDistance();
+    
+	// Display distance on the serial monitor
+	Serial.print("Distance: ");
+	Serial.print(distance);
+	Serial.println(" cm");
+    
+	if (distance < distanceThreshold) {
+  	// Object is near, activate buzzer
+  	digitalWrite(buzzerPin, HIGH);
+  	Serial.println("Warning: High Voltage & Object Detected!");
+	} else {
+  	// No object near, turn on LCD to display voltage
+  	digitalWrite(buzzerPin, LOW);
+  	Serial.println("Voltage High, No Object Near.");
+	}
+  } else {
+	// Voltage is low, do nothing
+lcd.clear();
+	digitalWrite(buzzerPin, LOW);
+	Serial.println("Voltage Normal, No Action.");
+  }
+
+  // Wait for a short period before next reading
+  delay(500);
+}
+
+// Function to calculate the distance using the ultrasonic sensor
+float getDistance() {
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+ 
+  long duration = pulseIn(echoPin, HIGH);
+  float distance = (duration * 0.034) / 2;  // Convert time to distance (cm)
+  return distance;
+}
